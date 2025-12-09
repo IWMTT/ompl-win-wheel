@@ -2,10 +2,6 @@ name: Build OMPL Windows wheel
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
   build-wheel:
@@ -15,26 +11,35 @@ jobs:
       - name: Checkout this repo
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
 
-      - name: Install Python build deps (pygccxml, pyplusplus, build)
+      - name: Install Python build deps (numpy / pygccxml / pyplusplus / build)
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip
           python -m pip install numpy pygccxml pyplusplus build
 
+      - name: Create tools directory
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path C:\tools -Force | Out-Null
+
       - name: Clone vcpkg
+        shell: pwsh
         run: |
           git clone https://github.com/microsoft/vcpkg.git C:\tools\vcpkg
 
       - name: Bootstrap vcpkg
+        shell: pwsh
         working-directory: C:\tools\vcpkg
         run: |
           .\bootstrap-vcpkg.bat
 
       - name: Install C++ deps via vcpkg (Boost/Eigen/yaml-cpp)
+        shell: pwsh
         working-directory: C:\tools\vcpkg
         run: |
           .\vcpkg.exe install `
@@ -43,55 +48,77 @@ jobs:
             eigen3:x64-windows `
             yaml-cpp:x64-windows
 
+      - name: Install castxml (for bindings generation)
+        shell: pwsh
+        run: |
+          choco install -y castxml
+
+      - name: Create src directory
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path C:\src -Force | Out-Null
+
       - name: Clone OMPL
+        shell: pwsh
         run: |
           git clone https://github.com/ompl/ompl.git C:\src\ompl
 
       - name: Init OMPL submodules
+        shell: pwsh
         working-directory: C:\src\ompl
         run: |
           git submodule update --init --recursive
 
-      - name: Configure OMPL with CMake (Python bindings ON)
+      - name: Configure OMPL with CMake (Python bindings ON, VAMP OFF)
+        shell: pwsh
         run: |
           cmake -S C:\src\ompl -B C:\src\ompl\build `
             -G "Visual Studio 17 2022" `
             -A x64 `
             -DOMPL_BUILD_PYBINDINGS=ON `
-            -DPYTHON_EXECUTABLE=%PythonLocation%\python.exe `
+            -DOMPL_BUILD_VAMP=OFF `
+            -DPYTHON_EXECUTABLE="$env:pythonLocation\python.exe" `
             -DCMAKE_TOOLCHAIN_FILE=C:\tools\vcpkg\scripts\buildsystems\vcpkg.cmake
 
       - name: Build OMPL + Python bindings
+        shell: pwsh
         run: |
           cmake --build C:\src\ompl\build --config Release --target update_bindings
           cmake --build C:\src\ompl\build --config Release
 
       - name: Prepare wheel source tree
+        shell: pwsh
         run: |
-          mkdir C:\wheel
-          mkdir C:\wheel\src
-          xcopy /E /I C:\src\ompl\build\Release\py-bindings\ompl C:\wheel\src\ompl
+          New-Item -ItemType Directory -Path C:\wheel\src -Force | Out-Null
+          Copy-Item -Recurse -Force C:\src\ompl\build\Release\py-bindings\ompl C:\wheel\src\ompl
 
-          echo [build-system] >  C:\wheel\pyproject.toml
-          echo requires = ['setuptools', 'wheel'] >> C:\wheel\pyproject.toml
-          echo build-backend = 'setuptools.build_meta' >> C:\wheel\pyproject.toml
+          $pyproject = @'
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+'@
+          Set-Content -Path C:\wheel\pyproject.toml -Value $pyproject -Encoding ascii
 
-          echo [metadata]                           >  C:\wheel\setup.cfg
-          echo name = ompl                          >> C:\wheel\setup.cfg
-          echo version = 1.6.0                      >> C:\wheel\setup.cfg
-          echo description = OMPL Python bindings (Windows build) >> C:\wheel\setup.cfg
-          echo author = OMPL / local build          >> C:\wheel\setup.cfg
-          echo license = BSD-3-Clause               >> C:\wheel\setup.cfg
-          echo.                                     >> C:\wheel\setup.cfg
-          echo [options]                            >> C:\wheel\setup.cfg
-          echo package_dir =                        >> C:\wheel\setup.cfg
-          echo `    =src                            >> C:\wheel\setup.cfg
-          echo packages = find:                     >> C:\wheel\setup.cfg
-          echo.                                     >> C:\wheel\setup.cfg
-          echo [options.packages.find]              >> C:\wheel\setup.cfg
-          echo where = src                          >> C:\wheel\setup.cfg
+          $setupcfg = @'
+[metadata]
+name = ompl
+version = 1.6.0
+description = OMPL Python bindings (Windows build)
+author = OMPL / local build
+license = BSD-3-Clause
+
+[options]
+package_dir =
+    =src
+packages = find:
+
+[options.packages.find]
+where = src
+'@
+          Set-Content -Path C:\wheel\setup.cfg -Value $setupcfg -Encoding ascii
 
       - name: Build wheel
+        shell: pwsh
         working-directory: C:\wheel
         run: |
           python -m build
