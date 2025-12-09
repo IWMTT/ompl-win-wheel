@@ -37,10 +37,10 @@ jobs:
       - name: Install C++ deps via vcpkg (Boost/Eigen/yaml-cpp)
         working-directory: C:\tools\vcpkg
         run: |
-          .\vcpkg.exe install ^
-            boost:x64-windows ^
-            boost-python:x64-windows ^
-            eigen3:x64-windows ^
+          .\vcpkg.exe install `
+            boost:x64-windows `
+            boost-python:x64-windows `
+            eigen3:x64-windows `
             yaml-cpp:x64-windows
 
       - name: Clone OMPL
@@ -54,11 +54,11 @@ jobs:
 
       - name: Configure OMPL with CMake (Python bindings ON)
         run: |
-          cmake -S C:\src\ompl -B C:\src\ompl\build ^
-            -G "Visual Studio 17 2022" ^
-            -A x64 ^
-            -DOMPL_BUILD_PYBINDINGS=ON ^
-            -DPYTHON_EXECUTABLE=%PythonLocation%\python.exe ^
+          cmake -S C:\src\ompl -B C:\src\ompl\build `
+            -G "Visual Studio 17 2022" `
+            -A x64 `
+            -DOMPL_BUILD_PYBINDINGS=ON `
+            -DPYTHON_EXECUTABLE=%PythonLocation%\python.exe `
             -DCMAKE_TOOLCHAIN_FILE=C:\tools\vcpkg\scripts\buildsystems\vcpkg.cmake
 
       - name: Build OMPL + Python bindings
@@ -85,7 +85,7 @@ jobs:
           echo.                                     >> C:\wheel\setup.cfg
           echo [options]                            >> C:\wheel\setup.cfg
           echo package_dir =                        >> C:\wheel\setup.cfg
-          echo ^    =src                            >> C:\wheel\setup.cfg
+          echo `    =src                            >> C:\wheel\setup.cfg
           echo packages = find:                     >> C:\wheel\setup.cfg
           echo.                                     >> C:\wheel\setup.cfg
           echo [options.packages.find]              >> C:\wheel\setup.cfg
