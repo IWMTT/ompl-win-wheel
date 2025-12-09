@@ -92,30 +92,37 @@ jobs:
           New-Item -ItemType Directory -Path C:\wheel\src -Force | Out-Null
           Copy-Item -Recurse -Force C:\src\ompl\build\Release\py-bindings\ompl C:\wheel\src\ompl
 
-          $pyproject = @'
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
-'@
-          Set-Content -Path C:\wheel\pyproject.toml -Value $pyproject -Encoding ascii
+          python - << 'PY'
+          from pathlib import Path
 
-          $setupcfg = @'
-[metadata]
-name = ompl
-version = 1.6.0
-description = OMPL Python bindings (Windows build)
-author = OMPL / local build
-license = BSD-3-Clause
+          root = Path(r"C:\wheel")
+          root.mkdir(parents=True, exist_ok=True)
 
-[options]
-package_dir =
-    =src
-packages = find:
+          (root / "pyproject.toml").write_text(
+              "[build-system]\n"
+              'requires = ["setuptools", "wheel"]\n'
+              'build-backend = "setuptools.build_meta"\n',
+              encoding="utf-8",
+          )
 
-[options.packages.find]
-where = src
-'@
-          Set-Content -Path C:\wheel\setup.cfg -Value $setupcfg -Encoding ascii
+          (root / "setup.cfg").write_text(
+              "[metadata]\n"
+              "name = ompl\n"
+              "version = 1.6.0\n"
+              "description = OMPL Python bindings (Windows build)\n"
+              "author = OMPL / local build\n"
+              "license = BSD-3-Clause\n"
+              "\n"
+              "[options]\n"
+              "package_dir =\n"
+              "    =src\n"
+              "packages = find:\n"
+              "\n"
+              "[options.packages.find]\n"
+              "where = src\n",
+              encoding="utf-8",
+          )
+          PY
 
       - name: Build wheel
         shell: pwsh
